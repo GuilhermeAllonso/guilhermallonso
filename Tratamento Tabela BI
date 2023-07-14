@@ -1,0 +1,136 @@
+USE [SQL_DB_4]
+GO
+/****** Object:  StoredProcedure [dbo].[BULK_ARQUIVO]    Script Date: 13/07/2023 23:35:52 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[BULK_ARQUIVO]
+--EXEC BULK_ARQUIVO
+
+AS
+	SET NOCOUNT ON;
+
+						DROP TABLE IF EXISTS #TB_VENDAS
+						CREATE TABLE #TB_VENDAS(
+								ID_Pedido VARCHAR(255),
+								Data_Pedido VARCHAR(255),
+								ID_Cliente VARCHAR(255),
+								Animal VARCHAR(255),
+								Regiao VARCHAR(255),
+								Pais VARCHAR(255),
+								[Product ID] VARCHAR(255),
+								Linha VARCHAR(255),
+								[Tipo Alimento] VARCHAR(255),
+								Total_Vendas MONEY,
+								Quantidade INT,
+								Desconto VARCHAR(255),
+								Lucro MONEY,
+								Idade VARCHAR(255),
+								Porte VARCHAR(255),
+								[Estado Fisiologico] VARCHAR(255))
+								 
+						BULK INSERT #TB_VENDAS
+						FROM 'C:\Users\Guilherme Allonso\Documents\PowerBI\VENDAS SPECIAL_.csv'
+						WITH
+						(
+							FIRSTROW = 2, 
+							FIELDTERMINATOR = ';',  
+							ROWTERMINATOR = '0x0a',  
+							TABLOCK,
+							codepage = 'ACP'
+						)
+
+						--SELECT * FROM #TB_VENDAS
+
+						UPDATE #TB_VENDAS
+						SET Animal = 'Special Dog'
+						WHERE Animal = 'Home Office'
+
+						UPDATE #TB_VENDAS
+						SET Animal = 'Special Cat'
+						WHERE Animal = 'Consumidor'
+
+						DELETE 
+						FROM #TB_VENDAS
+						WHERE Animal = 'Corporativo' 
+
+						UPDATE #TB_VENDAS
+						SET Linha = 'Super Premium'
+						WHERE Linha = 'Tecnologia'
+
+						UPDATE #TB_VENDAS
+						SET Linha = 'Premium Especial'
+						WHERE Linha = 'Suprimentos'
+
+						UPDATE #TB_VENDAS
+						SET Linha = 'Premium'
+						WHERE Linha = 'Moveis'
+
+						UPDATE #TB_VENDAS
+						SET [Tipo Alimento] = 'Seco'
+						WHERE [Tipo Alimento] IN('Accessories','Chairs','Phones','Copiers','Tables','Binders')
+
+						UPDATE #TB_VENDAS
+						SET [Tipo Alimento] = 'Umido'
+						WHERE [Tipo Alimento] IN('Supplies','Appliances','Machines','Bookcases','Storage','Furnishings')
+
+						UPDATE #TB_VENDAS
+						SET [Tipo Alimento] = 'Snack'
+						WHERE [Tipo Alimento] IN('Art','Paper','Envelopes','Fasteners','Labels')
+
+						UPDATE #TB_VENDAS
+						SET Idade = 'Filhote'
+						WHERE Idade = 'Medio'
+
+						UPDATE #TB_VENDAS
+						SET Idade = 'Adulto'
+						WHERE Idade = 'Alto'
+
+						UPDATE #TB_VENDAS
+						SET Idade = 'Senior'
+						WHERE Idade = 'Critico'
+
+						DELETE
+						FROM #TB_VENDAS
+						WHERE Idade = 'Baixo'
+
+						--SELECT  *  FROM #TB_VENDAS
+						
+						DROP TABLE IF EXISTS #TB_VENDAS_OK
+						SELECT
+							ID_Pedido,
+							Data_Pedido,
+							ID_Cliente,
+							Animal,
+							Regiao,
+							Pais,
+							[Product ID],
+							Linha,
+							[Tipo Alimento],
+							Total_Vendas,
+							CASE 
+								WHEN Animal = 'Special Dog' AND [Tipo Alimento] = 'Seco' THEN CAST(ROUND(Total_Vendas / (186.59),0) AS INT)
+								WHEN Animal = 'Special Dog' AND [Tipo Alimento] = 'Umido' OR [Tipo Alimento] = 'Snack' THEN CAST(ROUND(Total_Vendas / (3.19),0) AS INT)
+								WHEN Animal = 'Special Cat' AND [Tipo Alimento] = 'Seco' THEN CAST(ROUND(Total_Vendas / (134.21),0) AS INT)
+								WHEN Animal = 'Special Cat' AND [Tipo Alimento] = 'Umido' OR [Tipo Alimento] = 'Snack' THEN CAST(ROUND(Total_Vendas / (3.19),0) AS INT)
+								ELSE 0
+							END Quantidade,
+							Desconto,
+							Lucro,
+							Idade,
+							Porte,
+							[Estado Fisiologico]
+						INTO #TB_VENDAS_OK
+						FROM #TB_VENDAS
+
+						DELETE 
+						FROM #TB_VENDAS_OK
+						WHERE Quantidade = 0
+
+						TRUNCATE TABLE TB_VENDAS
+
+						INSERT INTO TB_VENDAS
+						SELECT * 
+						FROM #TB_VENDAS_OK
+						

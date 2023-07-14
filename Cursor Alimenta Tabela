@@ -1,0 +1,252 @@
+
+/****** Object:  StoredProcedure [dbo].[NOME_PROCEDURE]    Script Date: 27/06/2023 08:43:08 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[NOME_PROCEDURE] --'2023-06-20', '2023-06-20 23:59:59'
+
+AS
+
+	SET NOCOUNT ON;
+													
+DECLARE @DATAINI DATETIME = FORMAT(GETDATE(), 'yyyy-MM-dd')
+DECLARE @DATAFIM DATETIME = FORMAT(GETDATE(), 'yyyy-MM-dd')
+---------------------------------------------------------------------------------------TENTATIVAS-----------------------------------------------------
+													
+
+													DROP TABLE IF EXISTS #TEMP1
+													CREATE TABLE #TEMP1 (
+															DATA DATE,
+															HORA INT,
+															ID BIGINT,
+															TENTATIVAS INT,
+															SEGMENTO VARCHAR (50)
+													)
+
+													DROP TABLE IF EXISTS #FASE
+													CREATE TABLE #FASE (
+															DATA DATE,
+															ID BIGINT,
+															FASE VARCHAR(100),
+															SEGMENTO VARCHAR (50)
+													)
+
+													DROP TABLE IF EXISTS #TABELAS
+													CREATE TABLE #TABELAS(NOME VARCHAR(50), SEGMENTO VARCHAR(50), DESCRICAO VARCHAR(50))
+													INSERT INTO #TABELAS VALUES('TEMPORARIA', NULL, 'TIPO1', NULL)
+													INSERT INTO #TABELAS VALUES('ESTOQUE_1', 'SEGMENTO1', 'ESTOQUE', '_ESTOQUE_1')
+													INSERT INTO #TABELAS VALUES('ESTOQUE_2', 'SEGMENTO2', 'ESTOQUE', '_ESTOQUE_2')
+
+												--SELECT * FROM #TABELAS
+
+													DECLARE 
+														@TABELA VARCHAR(200),
+														@SQL NVARCHAR(MAX),
+														@HORA DATETIME,
+														@SEGMENTO VARCHAR(50),
+														@DESCRICAO VARCHAR(50)
+
+													
+													DECLARE TABELAS_CUR CURSOR FOR 
+													SELECT NOME, SEGMENTO, DESCRICAO  FROM #TABELAS 
+													OPEN TABELAS_CUR
+
+													FETCH NEXT FROM TABELAS_CUR
+													INTO @TABELA, @SEGMENTO, @DESCRICAO
+													
+													WHILE @@FETCH_STATUS = 0  
+													BEGIN
+														SET @HORA = GETDATE();
+														
+														IF @DESCRICAO = 'VENDAS'
+
+														BEGIN
+														SET @SQL = 
+														'SELECT 
+															CAST(INICIO_CHAMADA AS DATE) DATA,
+															DATEPART(HOUR, INICIO_CHAMADA) HORA,
+															ID,
+															COUNT(*) QTD,
+															SEGMENTO
+														FROM 
+															GRC_BASE_VENDAS.DBO.'+ @TABELA +' D WITH(NOLOCK)
+															INNER JOIN #CAMPANHAS C ON C.DESCRICAO = D.CAMPANHA
+															GROUP BY 
+																ID,
+																CAST(INICIO_CHAMADA AS DATE),
+																DATEPART(HOUR, INICIO_CHAMADA),
+																SEGMENTO' 
+
+																INSERT INTO #TEMP1
+																EXEC SP_EXECUTESQL @SQL
+																,N'@DATAINI DATETIME, @DATAFIM DATETIME'
+																,@DATAINI, @DATAFIM
+														END
+
+														ELSE
+															BEGIN 
+															SET @SQL = 
+														'	EXECUTE(''
+															SELECT 
+															DATA_ATUALIZACAO,
+															ID,
+															'''''+ @SEGMENTO +'''''
+														FROM
+															'+ @TABELA +' E WITH(NOLOCK)
+															WHERE CAST(DATA_ATUALIZACAO AS DATE) BETWEEN ? AND ?
+															GROUP BY ID, DATA_ATUALIZACAO'', @DATAINI, @DATAFIM) AT [10.103.2.28]'
+
+															INSERT INTO #FASE
+															EXEC SP_EXECUTESQL @SQL
+															,N'@DATAINI DATETIME, @DATAFIM DATETIME'
+															,@DATAINI, @DATAFIM
+														END
+
+
+														FETCH NEXT FROM TABELAS_CUR
+														INTO @TABELA, @SEGMENTO, @DESCRICAO, @
+
+													END
+													CLOSE TABELAS_CUR
+													DEALLOCATE TABELAS_CUR
+
+													DROP TABLE IF EXISTS #TEMP1_OK
+														SELECT
+															T.DATA,
+															T.HORA,
+															T.ID,
+															SUM(TENTATIVAS) TENTATIVAS,
+															MAX(FASE) FASE,
+															T.SEGMENTO
+														INTO #TEMP1_OK
+														FROM #TEMP1 T
+														LEFT JOIN #FASE F ON F.ID = T.ID AND F.DATA = T.DATA
+														GROUP BY
+															T.DATA,
+															T.HORA,
+															T.ID,
+															T.SEGMENTO
+--------------------------------------------------------OCORRENCIAS------------------------------------------------------------------------------------------------------
+
+															DROP TABLE IF EXISTS #TEMP2
+															CREATE TABLE #TEMP2 (
+																DATA DATE, 
+																ID BIGINT, 
+																HORA INT,
+																OCORRNECIA1 INT,
+																OCORRNECIA2 INT,
+																OCORRNECIA3 INT, 
+																OCORRNECIA4 INT, 
+																OCORRNECIA5 INT,
+																OCORRNECIA6 INT,
+																SEGMENTO VARCHAR(50)
+															)
+
+															DROP TABLE IF EXISTS #TABELAS1
+															CREATE TABLE #TABELAS1(NOME VARCHAR(50))
+															INSERT INTO #TABELAS1 VALUES('ESTOQUE3')
+
+															--SELECT * FROM #TABELAS1
+
+															DECLARE 
+																@TABELA1 VARCHAR(200),
+																@SQL1 NVARCHAR(MAX),
+																@HORA1 DATETIME
+
+															DECLARE TABELAS_CUR1 CURSOR FOR 
+															SELECT NOME FROM #TABELAS1
+															OPEN TABELAS_CUR1
+
+															FETCH NEXT FROM TABELAS_CUR1
+															INTO @TABELA1
+
+															WHILE @@FETCH_STATUS = 0  
+															BEGIN
+																SET @HORA1 = GETDATE();
+																SET @SQL1 = 
+																'	EXECUTE(''
+																	SELECT 
+																	DATA_HORA,
+																	A.ID,
+																	DATEPART(HOUR, DATA_HORA) AS HORA,
+																	SUM(CASE WHEN OCORRENCIA_ID IN(86, 84, 80, 81, 82, 88, 88) THEN 1 ELSE 0 END) ATENDIDAS,
+																	SUM(CASE WHEN OCORRENCIA_ID = 80 THEN 1 ELSE 0 END) RECADO,
+																	SUM(CASE WHEN OCORRENCIA_ID = 81 THEN 1 ELSE 0 END) DESCONHECE,  
+																	SUM(CASE WHEN OCORRENCIA_ID IN(82, 84) THEN 1 ELSE 0 END) CPC, 
+																	SUM(CASE WHEN OCORRENCIA_ID = 82 THEN 1 ELSE 0 END) TRANSFERENCIA,
+																	SUM(CASE WHEN OCORRENCIA_ID IN(86, 94, 92, 95, 96, 98, 90, 83) THEN 1 ELSE 0 END) [SEM INTERACAO],
+																	CASE WHEN ID = 119 THEN ''''SEGMENTO2'''' ELSE ''''SEGMENTO1'''' END SEGMENTO
+																FROM 
+																	'+ @TABELA1 +' A WITH(NOLOCK)
+																WHERE 
+																	CAST(DATA_HORA AS DATE) BETWEEN ? AND ?
+																	AND ID IN(105, 119)
+																	AND CODIGO_FUP BETWEEN 80 AND 98
+																	GROUP BY
+																		DATA_HORA,
+																		A.ID,
+																		CASE WHEN ID = 119 THEN ''''SEGMENTO2'''' ELSE ''''SEGMENTO1'''' END'', @DATAINI, @DATAFIM) AT [10.103.2.26]'
+
+																INSERT INTO #TEMP2
+																EXEC SP_EXECUTESQL @SQL1
+																	,N'@DATAINI DATETIME, @DATAFIM DATETIME'
+																	,@DATAINI, @DATAFIM
+
+																PRINT @TABELA1 + ': ' + CAST(DATEDIFF(SECOND, @HORA1, GETDATE()) AS VARCHAR(20))
+
+																FETCH NEXT FROM TABELAS_CUR1
+																INTO @TABELA1
+
+															END
+															CLOSE TABELAS_CUR1
+															DEALLOCATE TABELAS_CUR1
+
+
+-----------------------------------------------------------------------BOLETOS---------------------------------------------------------------------------------------------
+															
+														DROP TABLE IF EXISTS #VENDAS_REALIZADAS
+														CREATE TABLE #VENDAS_REALIZADAS (
+															SEGMENTO VARCHAR(10),
+															DATA DATE,
+															HORA INT,
+															VENDAS_REALIZADAS INT,
+															ID BIGINT
+														)
+
+														INSERT INTO #VENDAS_REALIZADAS
+														EXECUTE('
+														SELECT		CASE WHEN ID = 105 THEN ''SEGMENTO1'' ELSE ''SEGMENTO2'' END SEGMENTO,
+																	CONVERT(DATE,DATA,104) AS DATA,
+																	DATEPART(HOUR, DATA) HORA,
+																	COUNT(*) AS QTD,
+																	ID
+														FROM		.[dbo].[VW_GRC_BOLETO]B WITH (NOLOCK)
+														WHERE		DATA BETWEEN ? AND ?
+																	AND ID IN(105, 119)
+														GROUP BY	CASE WHEN ID = 105 THEN ''SEGMENTO1'' ELSE ''SEGMENTO2'' END,
+																	CONVERT(DATE,DATA,104), ID, DATEPART(HOUR, DATA)', @DATAINI, @DATAFIM) AT [10.103.2.26]
+															
+															
+															INSERT INTO TABELA_FISICA
+															SELECT
+																T.DATA,
+																T.HORA,
+																ISNULL(SUM(T.OCORRENCIA1),0) TENTATIVAS,
+																ISNULL(SUM(A.OCORRENCIA2),0) ATENDIDAS,
+																ISNULL(SUM(A.OCORRENCIA3),0) RECADO,
+																ISNULL(SUM(A.OCORRENCIA4),0) DESCONHECE,
+																ISNULL(SUM(A.OCORRENCIA5),0) CPC,
+																ISNULL(SUM(A.OCORRENCIA6),0) TRANSFERENCIA,
+																ISNULL(SUM(B.OCORRENCIA7), 0) BOLETOS,
+																ISNULL(SUM(A.OCORRENCIA8),0) [SEM INTERACAO],
+																T.FASE,
+																T.SEGMENTO
+															FROM #TEMP1_OK T
+															LEFT JOIN #TEMP2 A ON A.DATA = T.DATA AND A.ID = T.ID AND A.SEGMENTO = T.SEGMENTO AND A.HORA = T.HORA
+															LEFT JOIN #VENDAS_REALIZADAS B ON B.DATA = T.DATA AND B.ID = T.ID AND B.SEGMENTO = T.SEGMENTO AND B.HORA = T.HORA
+															LEFT JOIN TABELA_FISICA P ON P.DATA = T.DATA AND P.HORA = T.HORA
+															WHERE P.HORA IS NULL
+															GROUP BY
+																T.DATA, T.HORA, T.FASE, T.SEGMENTO
